@@ -1,0 +1,65 @@
+#!/usr/sbin/nft -f
+# Stateful Inter-VLAN Firewall & NAT Policy (nftables)
+
+flush ruleset
+
+define WAN_IF    = "eth0"
+define MGMT_IF   = "eth1.10"
+define SRV_IF    = "eth1.20"
+define STAFF_IF  = "eth1.30"
+define IOT_IF    = "eth1.40"
+define VPN_NET   = 10.8.0.0/24
+
+define AD_DNS_SRV   = 192.168.20.10
+define UBUNTU_API   = 192.168.20.20
+define GRAFANA_SRV  = 192.168.20.30
+define RFC1918_NETS = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        iif "lo" accept
+        ct state established,related accept
+        ct state invalid drop
+
+        # Allow SSH & ICMP to Firewall strictly from VLAN 10 (Mgmt) and VPN
+        iifname $MGMT_IF tcp dport 22 accept
+        ip saddr $VPN_NET tcp dport 22 accept
+        iifname $MGMT_IF icmp type echo-request accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Stateful inspection: allow return traffic for established sessions
+        ct state established,related accept
+        ct state invalid drop
+
+        # 1. Management (VLAN 10) & Remote Admin VPN -> Full access to all zones
+        iifname $MGMT_IF accept
+        ip saddr $VPN_NET accept
+
+        # 2. Monitoring & Servers (VLAN 20) -> Pull RTSP/Telemetry from VLAN 40
+        ip saddr { $UBUNTU_API, $GRAFANA_SRV } oifname $IOT_IF tcp dport { 554, 9100 } accept
+
+        # 3. Staff (VLAN 30) -> Allow AD/DNS (.20.10) and Internal Web/Grafana (.20.20, .20.30)
+        iifname $STAFF_IF ip daddr $AD_DNS_SRV udp dport { 53, 88, 123, 389 } accept
+        iifname $STAFF_IF ip daddr $AD_DNS_SRV tcp dport { 53, 88, 389, 445 } accept
+        iifname $STAFF_IF ip daddr { $UBUNTU_API, $GRAFANA_SRV } tcp dport { 80, 443, 3000 } accept
+
+        # 4. IoT & CCTV (VLAN 40) -> STRICTLY BLOCK & LOG lateral movement to VLAN 10, 20, 30
+        iifname $IOT_IF ip daddr $RFC1918_NETS log prefix "DROP_IOT_LATERAL: " drop
+
+        # 5. Outbound Internet Access (VLAN 10, 20, 30 allowed; VLAN 40 NTP only)
+        iifname { $MGMT_IF, $SRV_IF, $STAFF_IF } oifname $WAN_IF accept
+        iifname $IOT_IF oifname $WAN_IF udp dport 123 accept
+    }
+}
+
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+        oifname $WAN_IF masquerade
+    }
+}
