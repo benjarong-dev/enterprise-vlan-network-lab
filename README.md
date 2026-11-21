@@ -4,7 +4,7 @@ Logical network architecture and configuration lab implementing **Router-on-a-St
 
 ## Network Topology
 
-![Enterprise Network Topology](./topology/enterprise-network-topology.png)
+<img src="topology/enterprise-network-topology.png" alt="Enterprise Network Topology" width="100%">
 
 
 ## Architecture Highlights
