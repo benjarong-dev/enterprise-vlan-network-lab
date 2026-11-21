@@ -4,35 +4,7 @@ Logical network architecture and configuration lab implementing **Router-on-a-St
 
 ## Network Topology
 
-```text
-                       [ ISP / Internet ]
-                              | (eth0 - WAN)
-              +---------------+---------------+
-              |  Edge Router & Linux Firewall |
-              |   (nftables Stateful + NAT)   |
-              +---------------+---------------+
-                              |
-                 802.1Q Trunk | eth1 <-> Gi1/0/24
-              (Tagged VLANs: 10, 20, 30, 40)
-                              |
-      +-----------------------+-----------------------+
-      |      Branch-Core-SW01 (L2 Managed Switch)     |
-      +-----+-----------------+-----------------+-----+
-            |                 |                 |
- Gi1/0/1-4  |   Te1/0/1 &     |  Gi1/0/13-20    | Gi1/0/21-23
-(Untag V10) |   Gi1/0/5-12    | (V10 Untag /    | (Untag V40)
-            |  (Tag V10,V20)  |  V30,V40 Tag)   |
-            v                 v                 v
-   +----------------+ +----------------+ +-----------------+
-   | VLAN 10: Mgmt  | | VLAN 20: Srv   | | Wi-Fi & CCTV    |
-   | 192.168.10.0/24| | 192.168.20.0/24| | V30: .30.0/24   |
-   | - Admin PC     | | - Proxmox Host | |  (Staff Wi-Fi)  |
-   | - Omada (.10.5)| | - AD  (.20.10) | | V40: .40.0/24   |
-   +----------------+ | - API (.20.20) | |  (Isolated IoT) |
-                      | - Mon (.20.30) | +-----------------+
-                      +----------------+
-```
-
+![Enterprise Network Topology](topology/vlan-network-diagram.png)
 
 ## Architecture Highlights
 
